@@ -53,4 +53,5 @@ Business Logic
 - Pend up to 5 orders simultaneously, but no more
 
 
-
+Work product of T. Madison Glimp. Attribution credit due to Victor Irechukwu, Taylor Luehrs, Mubarak Olukotun, and Andy Byrd.
+Use with attribution permitted on request. 4.4.25.
