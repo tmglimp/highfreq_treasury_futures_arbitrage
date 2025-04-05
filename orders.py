@@ -12,7 +12,6 @@ from leaky_bucket import leaky_bucket
 # Ignore insecure error messages
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
 def format_value(value, A_symbol, B_symbol, A_incr, B_incr):
     """
     Returns:
@@ -31,13 +30,14 @@ def format_value(value, A_symbol, B_symbol, A_incr, B_incr):
         min_fluc = 15.625
     else:
         raise ValueError(f"Unsupported symbol: {chosen_symbol}")
-
+    
     # Step 3: Round the value to the nearest incremental interval (min_fluc)
-    exact_price = round(value / min_fluc) * min_fluc
+    exact_price = (value // min_fluc)
+    exact_price = (exact_price * min_fluc)
 
     # Step 4: Round the result to 6 decimal places
     exact_price = round(exact_price, 6)
-
+    
     # Step 5: Format the number as a string with exactly 6 decimal places
     exact_price = str(exact_price)
 
@@ -55,6 +55,8 @@ def format_value(value, A_symbol, B_symbol, A_incr, B_incr):
     exact_price = float(exact_price)
 
     return exact_price
+    print(f'Exact price with Futures contact-specific incremental rounding is being printed as', exact_price)
+    # Need to add an escape route if price is returned as 0 that relaunches at top of cf_ctd.py.
 
 def suppress_order_warning(message_ids):
     """
@@ -69,10 +71,6 @@ def suppress_order_warning(message_ids):
     response = requests.post(url, json=data, verify=False)
     print("Suppression response:", response.text)
     return response.json()
-
-
-##  https://www.interactivebrokers.com/campus/ibkr-api-page/webapi-doc/#order-reply-suppression-23
-##  resource for that subject
 
 def orderRequest(ORDERS):
 
@@ -93,9 +91,9 @@ def orderRequest(ORDERS):
         B_symbol = (first_row["B_FUT_TICKER"])
         A_incr = float(first_row["A_FUT_INCREMENT"])
         B_incr = float(first_row["A_FUT_INCREMENT"])
-        value = (first_row["PairsAdjNetBasis"] * 0.6) / 1000
-        exact_price_str = format_value(value, A_symbol, B_symbol, A_incr, B_incr)
-        exact_price = float(exact_price_str)
+        value = (first_row["PairsAdjNetBasis"])/1000
+        exact_price_i = format_value(value, A_symbol, B_symbol, A_incr, B_incr)
+        exact_price = float(exact_price_i)
 
     except KeyError as e:
         print(f"Missing column: {e}")
@@ -105,12 +103,13 @@ def orderRequest(ORDERS):
     json_body = {
         "orders": [
             {
+                "exchange":  f"SMART;;;{front_conId},{back_conId}",
                 "conidex": f"28812380;;;{front_conId}/{front_ratio},{back_conId}/{back_ratio}",
                 "orderType": "LMT",
-                "price": -1 * exact_price,
+                "price": float(-1 * exact_price),
                 "side": "BUY",
                 "tif": "DAY",
-                "quantity": quantity,
+                "quantity": int(quantity),
                 "secType": 'FUT',
                 "overridePercentageConstraints": True
             }
@@ -124,7 +123,6 @@ def orderRequest(ORDERS):
     order_req = requests.post(url=url, verify=False, json=json_body)
     print(order_req.status_code)
     print(order_req.text)
-
 
 if __name__ == "__main__":
     orderRequest(config.ORDERS)
