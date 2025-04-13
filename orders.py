@@ -129,7 +129,7 @@ def orderRequest(updated_ORDERS):
         "orders": [
             {
                 "exchange":  f"SMART;;;{front_conId},{back_conId}",
-                "conidex": f"28812380;;;{front_conId}/{back_ratio},{back_conId}/{front_ratio}",
+                "conidex": f"28812380;;;{front_conId}/{front_ratio},{back_conId}/{back_ratio}",
                 "orderType": "LMT",
                 "price": float(1*exact_price),
                 "side": "BUY",
