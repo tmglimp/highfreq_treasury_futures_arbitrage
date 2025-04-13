@@ -91,9 +91,7 @@ def calculate_quantities_with_sma(HEDGES_Combos):
                 HEDGES_Combos[f'{leg}_GrossBasis'],
                 HEDGES_Combos[f'{leg}_ImpliedRepo'],
                 HEDGES_Combos[f'{leg}_DirtyPrice'],
-                HEDGES_Combos[f'{leg}_Days']
-            )
-        ]
+                HEDGES_Combos[f'{leg}_Days'])]
         HEDGES_Combos[f'{leg}_NetBasis'] = [
             sia_net_basis(gb, carry)
             for gb, carry in zip(HEDGES_Combos[f'{leg}_GrossBasis'], HEDGES_Combos[f'{leg}_Carry'])
@@ -126,6 +124,15 @@ def calculate_quantities(HEDGES_Combos, SMA):
     # For each row, compute the optimal integer quantities.
     qtys = HEDGES_Combos.apply(lambda row: optimize_quantities_for_row(row, limit), axis=1)
     HEDGES_Combos = pd.concat([HEDGES_Combos, qtys], axis=1)
+
+    #Correct the record as to ratios
+    B = HEDGES_Combos['A_Q_Value']
+    A = HEDGES_Combos['B_Q_Value']
+    print('print A, B ', (B, A))
+
+    HEDGES_Combos['A_Q_Value'] = A
+    HEDGES_Combos['B_Q_Value'] = B
+    print('print new A, B ', (HEDGES_Combos['A_Q_Value'], HEDGES_Combos['B_Q_Value']))
 
     # Compute the row-level notional.
     HEDGES_Combos['Row_Notional'] = (
