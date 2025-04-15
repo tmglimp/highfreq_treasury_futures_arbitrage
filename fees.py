@@ -1,5 +1,5 @@
 import config
-# Static fee schedule by tier and exchange/symbol
+
 TIERED_COMMISSIONS = [
     (0, 1000, 0.85),
     (1001, 10000, 0.65),
@@ -41,6 +41,10 @@ def get_commission_rate(volume):
     return 0.0
 
 def calculate_total_fees(A_exchange, A_symbol, B_exchange, B_symbol):
+    if config.updated_ORDERS.empty:
+        first_row = updated_ORDERS.iloc[0]
+    else: first_row = config.updated_ORDERS.iloc[0]
+
     commission = get_commission_rate(config.VOLUME)
 
     def get_symbol_fees(exchange, symbol):
@@ -52,27 +56,11 @@ def calculate_total_fees(A_exchange, A_symbol, B_exchange, B_symbol):
     fees_A = get_symbol_fees(A_exchange, A_symbol)
     fees_B = get_symbol_fees(B_exchange, B_symbol)
 
-    total_A = commission + fees_A["exchange"] + fees_A["reg"] + fees_A["giveup"]
-    total_B = commission + fees_B["exchange"] + fees_B["reg"] + fees_B["giveup"]
+    total_A = (commission + fees_A["exchange"] + fees_A["reg"] + fees_A["giveup"])*first_row["A_Q_Value"]
+    total_B = (commission + fees_B["exchange"] + fees_B["reg"] + fees_B["giveup"])*first_row["B_Q_Value"]
 
-    return {
-        "A_symbol": {
-            "exchange": A_exchange,
-            "commission": commission,
-            "exchange_fee": fees_A["exchange"],
-            "reg_fee": fees_A["reg"],
-            "giveup_fee": fees_A["giveup"],
-            "total_A": total_A
-        },
-        "B_symbol": {
-            "exchange": B_exchange,
-            "commission": commission,
-            "exchange_fee": fees_B["exchange"],
-            "reg_fee": fees_B["reg"],
-            "giveup_fee": fees_B["giveup"],
-            "total_B": total_B
-        },
-        "A_fees": total_A,
-        "B_fees": total_B
-    }
+    # If necessary, you could explicitly cast as a float:
+    # return float(total_A + total_B)
+    # But if total_A and total_B are already numeric, this is not needed.
+    return float(total_A + total_B)
 
