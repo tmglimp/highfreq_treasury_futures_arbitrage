@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import requests
 import urllib3
-import logging
+from fees import calculate_total_fees
 import config
 from leaky_bucket import leaky_bucket
 
@@ -32,7 +32,7 @@ def format_value(value, A_symbol, B_symbol, A_incr, B_incr):
         raise ValueError(f"Unsupported symbol: {chosen_symbol}")
 
     # Step 3: Round the value to the nearest incremental interval (min_fluc)
-    exact_price = (value*1.6 // min_fluc)
+    exact_price = (value*.6 // min_fluc)
     exact_price = (exact_price * min_fluc)
 
     # Step 4: Round the result to 6 decimal places
@@ -57,32 +57,6 @@ def format_value(value, A_symbol, B_symbol, A_incr, B_incr):
     return exact_price
     print(f'Exact price with Futures contact-specific incremental rounding is being printed as', exact_price)
 
-
-def suppress_order_warning(message_ids):
-    """
-    Suppresses messages based on message IDs.
-
-    Args:
-      message_ids (list): List of message IDs to suppress (e.g., ["o163"])
-
-    Returns:
-      dict: Response from the suppression endpoint if valid JSON is returned,
-            otherwise an empty dictionary.
-    """
-    print(f'Suppressing messageIds => {message_ids}')
-    url = f"{config.IBKR_BASE_URL}/v1/api/iserver/questions/suppress"
-    data = {"messageIds": message_ids}
-    leaky_bucket.wait_for_token()
-    response = requests.post(url, json=data, verify=False)
-    print("Suppression response:", response.text)
-
-    try:
-        return response.json()
-    except ValueError:
-        logging.warning("Response returned no valid JSON data; returning empty dictionary.")
-        return {}
-
-
 def suppress_order_warning(message_ids):
     """
     Args:
@@ -97,7 +71,6 @@ def suppress_order_warning(message_ids):
     response = requests.post(url, json=data, verify=False)
     print("Suppression response:", response.text)
     return response.json()
-
 
 def orderRequest(updated_ORDERS):
 
@@ -114,10 +87,16 @@ def orderRequest(updated_ORDERS):
         quantity = int(first_row["PairsLCM"])
         A_symbol = (first_row["A_FUT_TICKER"])
         B_symbol = (first_row["B_FUT_TICKER"])
+        A_exch = (first_row["A_FUT_UNDERLYING_EXCHANGE"])
+        B_exch = (first_row["B_FUT_UNDERLYING_EXCHANGE"])
         A_incr = float(first_row["A_FUT_INCREMENT"])
         B_incr = float(first_row["A_FUT_INCREMENT"])
         value = (first_row["PairsAdjNetBasis"])/1000
-        exact_price_i = format_value(value, A_symbol, B_symbol, A_incr, B_incr)
+        print('printing order value as', value)
+        value_after_fees = float(value - calculate_total_fees(A_exch, A_symbol, B_exch, B_symbol))
+        print('printing order value after fees as', value_after_fees)
+        reduced_value = value_after_fees * .3
+        exact_price_i = format_value(reduced_value, A_symbol, B_symbol, A_incr, B_incr)
         exact_price = float(exact_price_i)
 
     except KeyError as e:
@@ -136,7 +115,6 @@ def orderRequest(updated_ORDERS):
                 "tif": "DAY",
                 "quantity": int(quantity),
                 "secType": 'FUT',
-                "outsideRth": True,
                 "outsideRth": "True"
             }
         ]
