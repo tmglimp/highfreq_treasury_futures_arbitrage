@@ -11,7 +11,6 @@ from orders import suppress_order_warning
 from risklimits import fetch__historical
 from scraper import run_scraper
 
-
 def search_for_updates(file):
     """Placeholder for your update/search logic."""
     print(f"🔍 Searching for updates on '{file}'...")

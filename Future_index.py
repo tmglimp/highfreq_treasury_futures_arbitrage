@@ -32,7 +32,6 @@ def scan(symbols_csv):
         response = requests.get(url=url, verify=False)
         if response.status_code != 200:
             logging.error(f'Failed to fetch futures from IBKR. Status: {response.status_code}')
-            return None
         logging.info(f'Successfully retrieved futures from IBKR.')
         return response.json()
     except requests.exceptions.RequestException as e:
