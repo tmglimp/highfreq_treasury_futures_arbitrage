@@ -1,4 +1,4 @@
-This hedging algorithm is built to comply with the Volcker Rule's prohibition against proprietary trade by satisfying the risk-mitigation rules. See: 
+This hedging algorithm is built to comply with the Volcker Rule's restrictive parameters by satisfying the risk-mitigation rules with delta neutral calendar pairs. See: 
 https://www.sec.gov/files/rules/final/2020/bhca-9.pdf#page=4
   and
 https://www.cftc.gov/sites/default/files/idc/groups/public/@newsroom/documents/file/volckerrule_factsheet_final.pdf#page=2
