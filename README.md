@@ -6,5 +6,5 @@ https://www.cftc.gov/sites/default/files/idc/groups/public/@newsroom/documents/f
 Underlying methodology provided by Bruce Tuckman in Fixed Income Securities: Tools for Today's Markets (5e). He credits Goldman Sachs' FIS trade desk for the invention.
 
 As set out in the MVP.txt file, all rights are reserved by T. Madison Glimp with credit attributed to Victor Irechukwu, Taylor Luehrs, Andy Byrd, and Mubarak Olukotun. 
-Use with attribution permitted upon request. 
+Use with attribution permitted upon request. Commercial licenses available for sale.
 4.15.2025.
