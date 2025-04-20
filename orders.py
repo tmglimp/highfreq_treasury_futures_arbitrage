@@ -18,7 +18,7 @@ cleared_trades = []
 _last_empty_time = None
 placed_orders_runtime = pd.DataFrame()
 
-initial_margins = {"ZT": 1100, "ZF": 1650, "ZN": 2200, "Z3N": 1375, "TN": 2750}
+initial_margins = {"ZT": 1200, "ZF": 1250, "ZN": 2200, "Z3N": 1800, "TN": 2550}
 
 def get_current_timestamp():
     from datetime import datetime
