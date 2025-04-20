@@ -248,8 +248,6 @@ def orderRequest(updated_ORDERS):
     if updated_ORDERS is None:
         updated_ORDERS = config.updated_ORDERS
 
-    check_and_cancel_orders()
-
     if updated_ORDERS.empty:
         print("No orders available in config.updated_ORDERS to place.")
         return
@@ -352,9 +350,9 @@ def orderRequest(updated_ORDERS):
             placed_orders_runtime.to_csv('placed_orders_runtime.csv')
             print("\n✅ Order recorded in placed_orders_runtime.csv")
             break
-
         except Exception as e:
             print(f"Failed to place order at index {idx}: {e}")
+    check_and_cancel_orders()
 
 if __name__ == "__main__":
     orderRequest()
