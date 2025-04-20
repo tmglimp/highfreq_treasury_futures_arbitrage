@@ -7,4 +7,5 @@ Underlying methodology c/o Bruce Tuckman in Fixed Income Securities: Tools for T
 
 As set out in the MVP.txt file, all rights are reserved by T. Madison Glimp with credit attributed to Victor Irechukwu, Taylor Luehrs, Andy Byrd, and Mubarak Olukotun. 
 Use with attribution permitted permitted on request. Commercial licenses available.
-4.15.2025.
+Big thanks to the U. IL at Chicago's MSc-Fin staff. 
+4.19.2025.
