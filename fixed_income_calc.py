@@ -5,17 +5,16 @@ fixed_income_calc.py
 ### THANKS TO PROF. JOHN MILLER OF THE U. IL AT CHICAGO FOR SHARING MUCH OF THE BELOW WITH THE UIC MS FIN. DEPT. ###
 
 """
-This module computes key fixed‑income metrics for U.S. Treasury bonds including:
-  - Theoretical price for spot dirty no-arbitrage derivations (BPrice)
-  - Yield‑to‑maturity and price-to-yield (calculate_ytm and P2Y)
-  - Accrued interest (AInt)
-  - Modified duration (MDur)
-  - Macaulay duration (MacDur)
-  - DV01 (PVBP)
-  - Convexity (Cvx)
-  - Approximate duration
-  - Approximate convexity
-
+This module computes SIA standardized fixed‑income metrics for U.S. Treasury bonds including:
+ - Theoretical price for spot dirty no-arbitrage derivations (BPrice)
+ - Yield‑to‑maturity and price-to-yield (calculate_ytm and P2Y)
+ - Accrued interest (AInt)
+ - Modified duration (MDur)
+ - Macaulay duration (MacDur)
+ - DV01 (PVBP)
+ - Convexity (Cvx)
+ - Approximate duration
+ - Approximate convexity
 """
 
 from datetime import datetime, timedelta
