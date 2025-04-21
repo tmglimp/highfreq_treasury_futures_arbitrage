@@ -1,24 +1,27 @@
 """
 fixed_income_calc.py
+"""
 
+### THANKS TO PROF. JOHN MILLER OF THE U. IL AT CHICAGO FOR SHARING MUCH OF THE BELOW WITH THE UIC MS FIN. DEPT. ###
+
+"""
 This module computes key fixed‑income metrics for U.S. Treasury bonds including:
-  - Theoretical bond price (BPrice)
-  - Yield‑to‑maturity (calculate_ytm and P2Y)
+  - Theoretical price for spot dirty no-arbitrage derivations (BPrice)
+  - Yield‑to‑maturity and price-to-yield (calculate_ytm and P2Y)
   - Accrued interest (AInt)
   - Modified duration (MDur)
   - Macaulay duration (MacDur)
   - DV01 (PVBP)
   - Convexity (Cvx)
-  - Approximate duration and approximate convexity
+  - Approximate duration
+  - Approximate convexity
 
-It also includes helper functions for date calculations and rounding of years‑to‑maturity.
 """
 
 from datetime import datetime, timedelta
 from math import pow
 import pandas as pd
 from scipy.optimize import minimize_scalar
-
 
 # ---------------- Helper: Round Years-to-Maturity ----------------
 def round_ytm(ytm):
@@ -28,7 +31,6 @@ def round_ytm(ytm):
     if pd.isnull(ytm):
         return None
     return round(ytm * 2) / 2.0
-
 
 # ---------------- Date & Term Functions ----------------
 def calculate_term(settlement_date_str, maturity_date_str, day_count_convention=365.25):
@@ -40,7 +42,6 @@ def calculate_term(settlement_date_str, maturity_date_str, day_count_convention=
     days_to_maturity = (maturity_date - settlement_date).days
     term_in_years = days_to_maturity / day_count_convention
     return term_in_years
-
 
 def compute_settlement_date(trade_date, t_plus=1):
     """
@@ -56,7 +57,6 @@ def compute_settlement_date(trade_date, t_plus=1):
         if settlement_date.weekday() < 5:  # Monday=0, ..., Friday=4
             business_days_added += 1
     return settlement_date.strftime('%Y%m%d')
-
 
 # ---------------- Yield and Price Functions ----------------
 def calculate_ytm(market_price, face_value, coupon_rate, time_to_maturity, periods_per_year=2, n_digits=2):
@@ -103,7 +103,6 @@ def calculate_ytm(market_price, face_value, coupon_rate, time_to_maturity, perio
     print("YTM calculation did not converge within the maximum number of iterations.")
     return ytm
 
-
 def accrual_period(begin, settle, next_coupon, day_count=1):
     """
     Computes the accrual period.
@@ -122,14 +121,12 @@ def accrual_period(begin, settle, next_coupon, day_count=1):
         S = [int(settle[:4]), int(settle[4:6]), int(settle[6:8])]
         return (360 * (S[0] - L[0]) + 30 * (S[1] - L[1]) + S[2] - L[2]) / 180
 
-
 def AInt(cpn, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
     """
     Computes the accrued interest.
     """
     v = accrual_period(begin, settle, next_coupon, day_count)
     return cpn / period * v
-
 
 def BPrice(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
     """
@@ -158,7 +155,6 @@ def BPrice(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=Non
         price = pow(1 + Y, v) * price - v * C
 
     return price
-
 
 # ---------------- Duration, Convexity and DV01 Functions ----------------
 def MDur(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
@@ -194,7 +190,6 @@ def MDur(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None,
         mdur = (C / pow(Y, 2) * (1 - pow(1 + Y, -T))) + (T * (100 - C / Y) / pow(1 + Y, T + 1))
     return mdur / (period * P)
 
-
 def MacDur(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
     """
     Computes the Macaulay duration.
@@ -203,7 +198,6 @@ def MacDur(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=Non
     if mdur is None:
         return None
     return mdur * (1 + yield_ / period)
-
 
 def DV01(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
     """
@@ -215,7 +209,6 @@ def DV01(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None,
     if P is None or mdur is None:
         return None
     return round(mdur * P * 0.0001, 5)
-
 
 def Cvx(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1):
     """
@@ -249,7 +242,6 @@ def Cvx(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, 
     )
     return dcv / (P * period ** 2)
 
-
 def P2Y(price, cpn, term, period=2, begin=None, settle=None, next_coupon=None):
     """
     Convert bond price to yield‑to‑maturity by minimizing the squared error between
@@ -265,7 +257,6 @@ def P2Y(price, cpn, term, period=2, begin=None, settle=None, next_coupon=None):
     result = minimize_scalar(objective, bounds=(-0.5, 1), method='bounded')
     return result.x
 
-
 def approximate_duration(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1,
                          delta_y=0.0001):
     """
@@ -280,7 +271,6 @@ def approximate_duration(cpn, term, yield_, period=2, begin=None, settle=None, n
         return None
     return (price_down - price_up) / (2 * price * delta_y)
 
-
 def approximate_convexity(cpn, term, yield_, period=2, begin=None, settle=None, next_coupon=None, day_count=1,
                           delta_y=0.0001):
     """
@@ -294,7 +284,6 @@ def approximate_convexity(cpn, term, yield_, period=2, begin=None, settle=None, 
     if price is None or price == 0:
         return None
     return (price_down + price_up - 2 * price) / (price * delta_y ** 2)
-
 
 # ---------------- Bond Metrics Calculation ----------------
 def calculate_bond_metrics(face_value, market_price, issue_date_str, maturity_date_str, coupon_rate,
@@ -338,7 +327,6 @@ def calculate_bond_metrics(face_value, market_price, issue_date_str, maturity_da
         "approx_duration": approx_duration,
         "approx_convexity": approx_convexity,
     }
-
 
 def compute_ust_kpis(item):
     """
@@ -416,7 +404,6 @@ def compute_ust_kpis(item):
         }
     else:
         return None
-
 
 # ---------------- Main Test Block ----------------
 if __name__ == '__main__':
