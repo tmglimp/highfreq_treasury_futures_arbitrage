@@ -1,4 +1,4 @@
-This Volcker-compliant hedging algorithm satisfies the risk-mitigation rules with basis neutral {ZT,ZF,Z3N,ZN,TN} pairs.
+This Volcker-compliant algorithm satisfies the risk-mitigation rules with basis neutral {ZT,ZF,Z3N,ZN,TN} pairs.
 See: https://www.sec.gov/files/rules/final/2020/bhca-9.pdf#page=4
    and
 https://www.cftc.gov/sites/default/files/idc/groups/public/@newsroom/documents/file/volckerrule_factsheet_final.pdf#page=2
