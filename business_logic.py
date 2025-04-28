@@ -9,7 +9,7 @@ from leaky_bucket import leaky_bucket
 def business_logic_function():
     """
     Continuously executes the business logic as a separate process all the way to the order placement.
-    This function runs in a loop and executes every 3 seconds.
+    This function runs in a loop and executes several times per second if unconstrained.
     """
     while True:
         # Ensure that the config.USTs and config.FUTURES DataFrames exist and are neither None nor empty.
