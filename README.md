@@ -1,5 +1,4 @@
-This algorithm has the right parts to satisfy Volcker's risk-mitigation rules with basis neutral {ZT,ZF,Z3N,ZN} implied invoice calendar switch spread pairs.
-See: https://cmegroupclientsite.atlassian.net/wiki/spaces/EPICSANDBOX/pages/457089763/Spreads+and+Combinations+Available+on+CME+Globex#IV-Implied-Intercommodity
+This algorithm has the right parts to satisfy Volcker's risk-mitigation rules with basis neutral {ZT,ZF,Z3N,ZN} invoice calendar switch spread pairs.
 See also: https://www.sec.gov/files/rules/final/2020/bhca-9.pdf#page=4
 See further: https://www.cftc.gov/sites/default/files/idc/groups/public/@newsroom/documents/file/volckerrule_factsheet_final.pdf#page=2
 
