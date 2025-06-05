@@ -3,7 +3,15 @@ See also: https://www.sec.gov/files/rules/final/2020/bhca-9.pdf#page=4
 See further: https://www.cftc.gov/sites/default/files/idc/groups/public/@newsroom/documents/file/volckerrule_factsheet_final.pdf#page=2
 
 Underlying methodology c/o Tuckman in Fixed Income Securities: Tools for Today's Markets (5e). He credits Black and Derman from Columbia U. and Goldman Sachs' FIS desk for inventing equity delta hedging. 
-CME/CBOT recognize the method as a UDS recursion in the exchange API's exceptional spreads panel.
+CME/CBOT recognize the method as a UDS recursion in the exchange API's exceptional spreads panel. They publish a periodic list of implied ratios as well, one of which is attached here.
+
+https://cmegroupclientsite.atlassian.net/wiki/spaces/EPICSANDBOX/pages/457092911/Implied+Intercommodity+Ratio+Spreads
+https://cmegroupclientsite.atlassian.net/wiki/spaces/EPICSANDBOX/pages/457703485/Security+Definition+for+Implied+Intercommodity+Ratio+Spreads
+https://cmegroupclientsite.atlassian.net/wiki/spaces/EPICSANDBOX/pages/457671390/Implied+ICS+Priority+List
+https://www.cmegroup.com/trading/interest-rates/intercommodity-spread.html
+
+Recovering corpusCusips for zeros requires credentials for the Treasury's API in addition to an IBKR account. It's more reliable than IBKR's scanner for contract discovery.  
+https://api-community.fiscal.treasury.gov/s/communityapi/a01Qo00000pDeK7IAK/enterprise-apisustreasurymarketablesecuritiesexperienceapi?tabset-83a38=2
 
 As set out in the MVP.txt file, all rights are reserved by T. Madison Glimp with credit attributed to Victor Irechukwu, Taylor Luehrs, Andy Byrd, Ethan MacMahon and Mubarak Olukotun.
 Use with attribution permitted permitted on request. Commercial licenses available.
