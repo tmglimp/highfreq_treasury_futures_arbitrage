@@ -2,14 +2,15 @@ import os
 import requests
 import pandas as pd
 from datetime import datetime
+import config
 
 # ────────────────────────────────────────────────────────
 # configuration
 # ────────────────────────────────────────────────────
-client_id = ""
-client_secret = ""
+client_id = "82c5ee299b404f62af1177b109377ea6"
+client_secret = "87391cd4aDF34645AE5D8687350C441A"
 tcf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TCF.xlsx")
-output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TCF_enriched.csv")
+output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "UST.index.csv")
 
 # ────────────────────────────────────────────────────
 # utilities
@@ -174,7 +175,8 @@ def fetch_treasury_data():
         axis=1
     )
     df_combined.to_csv(output_path, index=False)
-    print(f"Enriched file written to: {output_path}")
+    config.ZEROES = df_combined
+    print(f"Enriched file written to: {output_path}, saved to config.ZEROES")
 
 # ────────────────────────────────────────────────────
 # entry point

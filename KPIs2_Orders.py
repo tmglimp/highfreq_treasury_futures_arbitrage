@@ -2,6 +2,7 @@
 KPIs2_Orders
 """
 import json
+import logging
 import math
 from datetime import datetime
 
@@ -20,9 +21,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # SIA-Standardized Utility Functions  ## (Amend as needed to work with correct dataframe columns)
 def accrued_interest(coupon, mat_date, today):
-    last_coupon = pd.Timestamp(year=today.year, month=mat_date.month, day=mat_date.day)
+    try:
+        # Try direct substitution of month/day with today's year
+        last_coupon = mat_date.replace(year=today.year)
+    except ValueError:
+        # If invalid day (e.g., Feb 30), fallback to the last day of that month
+        last_day = pd.Timestamp(today.year, mat_date.month, 1) + pd.offsets.MonthEnd(0)
+        last_coupon = last_day
+
     if last_coupon > today:
-        last_coupon = last_coupon - pd.DateOffset(months=6)
+        last_coupon -= pd.DateOffset(months=6)
+
     days_accrued = (today - last_coupon).days
     return (coupon / 2) * (days_accrued / 182.5)
 
@@ -97,11 +106,28 @@ def calculate_quantities_with_sma(HEDGES_Combos):
 
     nl_value = get_acct_dets()
     nl_value = float(nl_value)
-    SMA = nl_value*4 #approximate reg-t margin limit
+    SMA = nl_value * 4  # approximate reg-t margin limit
+    config.SMA = SMA
     print(f'SMA => {SMA}')
-    return calculate_quantities(HEDGES_Combos, SMA)
+    return config.SMA
 
 def calculate_quantities(HEDGES_Combos, SMA):
+    SMA = calculate_quantities_with_sma(HEDGES_Combos)
+    if SMA > 25000:
+        HEDGES_Combos['A_Q_Value'], HEDGES_Combos['B_Q_Value'] = 1, 1
+        # If A_ImpliedRepo < B_ImpliedRepo, front is rich (forward roll: short A, long B).
+        # Otherwise, reverse roll (short B, long A).
+        HEDGES_Combos['A_Q_Value'] = np.where(
+            HEDGES_Combos['A_ImpliedRepo'] < HEDGES_Combos['B_ImpliedRepo'],
+            1,  # short A for forward roll
+            -1  # long A for reverse roll
+        )
+        HEDGES_Combos['B_Q_Value'] = np.where(
+            HEDGES_Combos['A_ImpliedRepo'] < HEDGES_Combos['B_ImpliedRepo'],
+            -1,  # long B for forward roll
+            1  # short B for reverse roll
+        )
+
     # Convert key columns to numeric.
     front_multiplier = pd.to_numeric(HEDGES_Combos['A_FUT_MULTIPLIER'], errors='coerce')
     back_multiplier = pd.to_numeric(HEDGES_Combos['B_FUT_MULTIPLIER'], errors='coerce')
@@ -116,61 +142,14 @@ def calculate_quantities(HEDGES_Combos, SMA):
     # Compute the DV01 ratio per row.
     HEDGES_Combos['ratio'] = A_fut_dv01 / B_fut_dv01
 
-    # Define the notional purchasing limit and optimal ratio of DV01 hedged futures pairs.
-    limit = config.UNDER * SMA  # insert nominal cushion to constrain position limit risk
-    print(f"Using notional limit ({config.UNDER} * SMA) = {limit}")
-
-    # For each row, compute the optimal integer quantities with a constrained optimization function.
-    # in pursuit of: https://www.cmegroup.com/education/courses/introduction-to-treasuries/treasuries-hedging-and-risk-management.html
-    qtys = HEDGES_Combos.apply(lambda row: optimize_quantities_for_row(row, limit), axis=1)
-    HEDGES_Combos = pd.concat([HEDGES_Combos, qtys], axis=1)
-
-    #Correct the record as to equity delta neutral ratios arising from assignment error in optimization fn
-    B = HEDGES_Combos['A_Q_Value']
-    A = HEDGES_Combos['B_Q_Value']
-
-    HEDGES_Combos['A_Q_Value'] = A
-    HEDGES_Combos['B_Q_Value'] = B
-
     # Compute the row-level notional value of each pair.
     HEDGES_Combos['Row_Notional'] = (HEDGES_Combos['A_Q_Value']*HEDGES_Combos['cost_A'] + HEDGES_Combos['B_Q_Value']*HEDGES_Combos['cost_B'])
-    total_notional = HEDGES_Combos['Row_Notional'].sum()
-
-    # Set a placeholder for PairsLCM to populate quantity field and reduce # of legs in each order.
-    HEDGES_Combos['PairsLCM'] = HEDGES_Combos.apply(
-        lambda row: math.gcd(int(row['A_Q_Value']), int(row['B_Q_Value']))
-        if pd.notnull(row['A_Q_Value']) and pd.notnull(row['B_Q_Value'])
-        else np.nan, axis=1
-    )
-
-    # Normalize quantities by dividing by the common factor.
-    HEDGES_Combos['A_Q_Value'] = HEDGES_Combos.apply(
-        lambda row: int(row['A_Q_Value']) // row['PairsLCM']
-        if row['PairsLCM'] not in [0, np.nan] else row['A_Q_Value'], axis=1
-    )
-    HEDGES_Combos['B_Q_Value'] = HEDGES_Combos.apply(
-        lambda row: int(row['B_Q_Value']) // row['PairsLCM']
-        if row['PairsLCM'] not in [0, np.nan] else row['B_Q_Value'], axis=1
-    )
 
     # Compute the adjusted net basis for each leg at the prescribed hedge ratio.
     HEDGES_Combos['PairsAdjNetBasis'] = ((
         (HEDGES_Combos['A_NetBasis'] * HEDGES_Combos['A_Q_Value']) -
         (HEDGES_Combos['B_NetBasis'] * HEDGES_Combos['B_Q_Value'])
     ))
-
-    # If A_ImpliedRepo < B_ImpliedRepo, front is rich (forward roll: short A, long B).
-    # Otherwise, reverse roll (short B, long A).
-    HEDGES_Combos['A_Q_Sign'] = np.where(
-        HEDGES_Combos['A_ImpliedRepo'] < HEDGES_Combos['B_ImpliedRepo'],
-        -1,  # short A for forward roll
-         1   # long A for reverse roll
-    )
-    HEDGES_Combos['B_Q_Sign'] = np.where(
-        HEDGES_Combos['A_ImpliedRepo'] < HEDGES_Combos['B_ImpliedRepo'],
-         1,  # long B for forward roll
-        -1   # short B for reverse roll
-    )
 
     # Convert volume columns to numeric.
     HEDGES_Combos['A_FUT_VOLUME'] = pd.to_numeric(HEDGES_Combos['A_FUT_VOLUME'], errors='coerce')
@@ -193,7 +172,10 @@ def calculate_quantities(HEDGES_Combos, SMA):
     HEDGES_Combos.to_csv('HEDGES_Combos.csv')
 
     unique_rows = (HEDGES_Combos
-        .drop_duplicates(subset=['A_FUT_CONID', 'A_FUT_SRC', 'B_FUT_CONID', 'B_FUT_SRC'], keep='first')
+        .drop_duplicates(subset=['A_FUT_CONID', 'B_FUT_CONID'], keep='first')
+        .copy())
+    unique_rows = (HEDGES_Combos
+        .drop_duplicates(subset=['A_FUT_CONID', 'B_FUT_CONID'], keep='first')
         .copy())
 
     if len(unique_rows) >= 5:

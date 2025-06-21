@@ -10,10 +10,9 @@ from orders import suppress_order_warning
 from risklimits import fetch__historical
 from scraper import run_scraper
 
-
 def search_for_updates(file):
     """Placeholder for your update/search logic."""
-    print(f"🔍 Searching for updates on '{file}'...")
+    print(f"Searching for updates on '{file}'...")
 
 def file_has_valid_header(path):
     """
@@ -26,7 +25,7 @@ def file_has_valid_header(path):
         # Return True if any expected key is found in the file header.
         return not expected_keys.isdisjoint(set(df.columns))
     except Exception as e:
-        print(f"⚠️ Failed to read header from {path}: {e}")
+        print(f"Failed to read header from {path}: {e}")
         return False
 
 def normalize_conid_column(df: pd.DataFrame, file_label: str) -> pd.DataFrame:
@@ -60,7 +59,7 @@ def check_files(file_list, update_config=False):
             # For historical CSV files, check the header.
             if file in ("FUTURES_historical.csv", "USTs_historical.csv"):
                 if not file_has_valid_header(path):
-                    print(f"❌ {file} has an invalid header.")
+                    print(f"{file} has an invalid header.")
                     statuses[file] = False
                     search_for_updates(file)
                     continue
@@ -70,69 +69,72 @@ def check_files(file_list, update_config=False):
             up_to_date = size > 0 and (mod_time >= recent_reset)
 
             if size == 0:
-                print(f"❌ {file} is empty (modified {mod_time}).")
+                print(f"{file} is empty (modified {mod_time}).")
                 statuses[file] = False
                 search_for_updates(file)
             elif not up_to_date:
-                print(f"❌ {file} is outdated (modified {mod_time}).")
+                print(f"{file} is outdated (modified {mod_time}).")
                 statuses[file] = False
                 search_for_updates(file)
             else:
-                print(f"✅ {file} is up to date (modified {mod_time}).")
+                print(f"{file} is up to date (modified {mod_time}).")
                 statuses[file] = True
 
                 if update_config and file.endswith(('.csv', '.index')):
                     try:
                         df = pd.read_csv(path)
-                        if file in ("FUTURES_historical.csv", "USTs_historical.csv", "UST.index", "FUTURES.index"):
+                        if file in ("FUTURES_historical.csv", "USTs_historical.csv", "UST.index.csv", "FUTURES.index"):
                             df = normalize_conid_column(df, file)
                         if file == "FUTURES_historical.csv":
                             config.FUTURES_historical = df
-                            print("Loaded FUTURES_historical.csv → config.FUTURES_historical")
+                            print("Loaded FUTURES_historical.csv >>> config.FUTURES_historical")
                         elif file == "USTs_historical.csv":
                             config.USTs_historical = df
-                            print("Loaded USTs_historical.csv → config.USTs_historical")
+                            print("Loaded USTs_historical.csv >>> config.USTs_historical")
                         elif file == "UST.index":
                             config.USTs = df
-                            print("Loaded UST.index → config.USTs")
+                            print("Loaded UST.index >>> config.USTs")
                         elif file == "FUTURES.index":
                             config.FUTURES = df
-                            print("Loaded FUTURES.index → config.FUTURES")
+                            print("Loaded FUTURES.index >>> config.FUTURES")
                     except Exception as e:
-                        print(f"⚠️ Error loading {file}: {e}")
+                        print(f"Error loading {file}: {e}")
         else:
-            print(f"❌ {file} does not exist.")
+            print(f"{file} does not exist.")
             statuses[file] = False
 
     return statuses
 
 if __name__ == "__main__":
     files_to_check = [
-        "UST.index",
+        "UST.index.csv",
         "USTs_historical.csv",
         "FUTURES.index",
         "FUTURES_historical.csv",
+        "TCF_enriched.csv"
     ]
     statuses = check_files(files_to_check, update_config=True)
 
     # Ensure index files
-    if not statuses.get("UST.index", False):
-        print("🚀 UST.index missing/stale: running scraper()")
+    if not statuses.get("UST.index.csv", False):
+        print("UST.index missing/stale: running scraper()")
         run_scraper()
         try:
-            df = pd.read_csv("UST.index")
-            df = normalize_conid_column(df, "UST.index")
+            df = pd.read_csv("UST.index.csv")
+            df = normalize_conid_column(df, "UST.index.csv")
             config.USTs = df
             expected_ust = len(df)
         except Exception as e:
-            print(f"⚠️ Couldn’t read UST.index after scrape: {e}")
+            print(f"Couldn’t read UST.index after scrape: {e}")
             expected_ust = 0
     else:
         print("Using cached UST.index from config.")
+        df = pd.read_csv("UST.index.csv")
+        config.USTs = df
         expected_ust = len(config.USTs) if hasattr(config, 'USTs') and 'conid' in config.USTs.columns else 0
 
     if not statuses.get("FUTURES.index", False):
-        print("🚀 FUTURES.index missing/stale: running Future_index.main()")
+        print("FUTURES.index missing/stale: running Future_index.main()")
         Future_index.main()
         try:
             df = pd.read_csv("FUTURES.index")
@@ -140,10 +142,13 @@ if __name__ == "__main__":
             config.FUTURES = df
             expected_futures = len(df)
         except Exception as e:
-            print(f"⚠️ Couldn’t read FUTURES.index after discovery: {e}")
+            print(f"Couldn’t read FUTURES.index after discovery: {e}")
             expected_futures = 0
     else:
         print("Using cached FUTURES.index from config.")
+        df = pd.read_csv("FUTURES.index")
+        config.USTs = df
+        expected_ust = len(config.FUTURES) if hasattr(config, 'FUTURES') and 'conid' in config.FUTURES.columns else 0
         expected_futures = len(config.FUTURES) if hasattr(config, 'FUTURES') and 'conid' in config.FUTURES.columns else 0
 
     print(f"Expected UST rows: {expected_ust}")
@@ -167,34 +172,38 @@ if __name__ == "__main__":
         rows = historical_df.to_dict(orient="records")
 
         while missing_or_empty:
-            print(f"  Retry {attempt} for {label}: missing or empty {len(missing_or_empty)} of {len(expected_ids)} ids")
+            print(f"Retry {attempt} for {label}: missing or empty {len(missing_or_empty)} of {len(expected_ids)} ids")
             new_data = fetch__historical(((i, {"conid": cid}) for i, cid in enumerate(missing_or_empty)), label)
+
+            # Check if first item in new_data is empty AND year_to_maturity < 0
+            first_key = next(iter(new_data), None)
+            if first_key is not None:
+                first_record = new_data[first_key]
+                if isinstance(first_record, list) and first_record:
+                    ytm = first_record[0].get("year_to_maturity", 1)
+                    if ytm < 0 and is_data_empty(first_record[0]):
+                        print(f"  Stopping retries for {label}: year_to_maturity < 0 and first result is empty.")
+                        break
+
             for cid, record in new_data.items():
                 if isinstance(record, list):
-                    # Append each record directly, preserving the JSON keys.
                     rows.extend(record)
                 else:
                     rows.append(record)
+
             df = pd.DataFrame(rows)
-            # Set the index to "conid"
             df.set_index("conid", inplace=True)
             csv_path = f"{label}_historical.csv"
             df.to_csv(csv_path, index=True)
-            historical_df = df.reset_index()  # update the copy used for checking
+            historical_df = df.reset_index()
             existing_ids = set(historical_df["conid"].astype(str))
             missing_or_empty = [cid for cid in expected_ids
                                 if cid not in existing_ids
                                 or is_data_empty(historical_df.loc[historical_df["conid"].astype(str) == cid].iloc[0])]
             attempt += 1
-        print(f"→ Saved {label}_historical.csv ({len(historical_df)} rows)")
 
-    print("Ensuring complete historical data for FUTURES and USTs...")
-    ensure_full_coverage_csv(
-        config.FUTURES["conid"].astype(str).tolist(), config.FUTURES_historical, "FUTURES"
-    )
-    ensure_full_coverage_csv(
-        config.USTs["conid"].astype(str).tolist(), config.USTs_historical, "USTs"
-    )
+        print(f"Saved {label}_historical.csv ({len(historical_df)} rows)")
+
 
     suppress_order_warning(config.SUPPRESSED_IDS.split(','))
     logic_thread = threading.Thread(target=business_logic_function, daemon=True)

@@ -5,7 +5,7 @@ fixed_income_calc.py
 ### THANKS TO PROF. JOHN MILLER OF THE U. IL AT CHICAGO FOR SHARING MUCH OF THE BELOW WITH THE UIC MS FIN. DEPT. ###
 
 """
-This module computes SIA standardized fixed‑income metrics for U.S. Treasury bonds including:
+This module computes SIA/FIA standardized fixed‑income metrics for U.S. Treasury bonds including:
  - Theoretical price for spot dirty no-arbitrage derivations (BPrice)
  - Yield‑to‑maturity and price-to-yield (calculate_ytm and P2Y)
  - Accrued interest (AInt)
@@ -15,6 +15,7 @@ This module computes SIA standardized fixed‑income metrics for U.S. Treasury b
  - Convexity (Cvx)
  - Approximate duration
  - Approximate convexity
+ - Conversion factor
 """
 
 from datetime import datetime, timedelta
@@ -58,54 +59,11 @@ def compute_settlement_date(trade_date, t_plus=1):
     return settlement_date.strftime('%Y%m%d')
 
 # ---------------- Yield and Price Functions ----------------
-def calculate_ytm(market_price, face_value, coupon_rate, time_to_maturity, periods_per_year=2, n_digits=2):
-    """
-    Calculate yield‑to‑maturity using an iterative method.
 
-    market_price: percentage price relative to face value (e.g. 98.5 means 98.5% of face)
-    face_value: par value (typically 100)
-    coupon_rate: annual coupon rate in percent (e.g., 5.0 for 5%)
-    time_to_maturity: in years
-    """
-    # Convert market_price from percent to actual price in currency terms.
-    market_price = market_price / 100.0 * face_value
-    coupon_rate = coupon_rate / 100.0
-    coupon_payment = face_value * coupon_rate / periods_per_year
-
-    def bond_price(ytm):
-        pv = 0
-        T = int(time_to_maturity * periods_per_year)
-        for t in range(1, T + 1):
-            pv += coupon_payment / (1 + ytm / periods_per_year) ** t
-        pv += face_value / (1 + ytm / periods_per_year) ** T
-        return pv
-
-    ytm_guess = coupon_rate
-    tolerance = 1e-8
-    max_iterations = 1000
-    ytm = ytm_guess
-
-    for _ in range(max_iterations):
-        price_at_ytm = bond_price(ytm)
-        delta_ytm = 1e-5
-        price_up = bond_price(ytm + delta_ytm)
-        price_down = bond_price(ytm - delta_ytm)
-        price_derivative = (price_up - price_down) / (2 * delta_ytm)
-
-        if abs(price_derivative) < 1e-12:
-            return round(ytm, n_digits)
-
-        ytm_new = ytm - (price_at_ytm - market_price) / price_derivative
-        if abs(ytm_new - ytm) < tolerance:
-            return round(ytm_new, n_digits)
-        ytm = ytm_new
-    print("YTM calculation did not converge within the maximum number of iterations.")
-    return ytm
 
 def accrual_period(begin, settle, next_coupon, day_count=1):
     """
     Computes the accrual period.
-
     For day_count==1, uses Actual/Actual.
     Otherwise, assumes a 30/360 convention.
     """

@@ -7,6 +7,7 @@ import urllib3
 import config
 from enums.MarketDataField import MarketDataField
 from leaky_bucket import leaky_bucket
+from ir_data.market_data import 
 
 # Configure logging to both file and stdout
 logging.basicConfig(
@@ -40,23 +41,25 @@ class MarketData:
             return None, None
 
         # Fetch market data in batches
-        market_data = MarketData.get_market_data(config.USTs, config.FUTURES)
+        market_data = MarketData.get_market_data(config.USTs, config.FUTURES, config.ZEROES)
 
         # Merge market data fields into config DataFrames
         config.USTs, config.FUTURES = MarketData.extract_market_data_fields(
-            config.USTs, config.FUTURES, market_data)
+            config.USTs, config.FUTURES, config.ZEROES, market_data)
 
         # Mark rows as "closed" if any price starts with "C"/"c" and remove them
         config.USTs  = MarketData.mark_and_remove_closed_rows(config.USTs)
         config.FUTURES = MarketData.mark_and_remove_closed_rows(config.FUTURES)
+        config.ZEROES = MarketData.mark_and_remove_closed_rows(config.ZEROES)
 
         # For FUTURES, convert futures price quotes to decimals
         config.FUTURES = MarketData.convert_futures_price(config.FUTURES)
 
         # Update UST pricing values
         config.USTs = MarketData.update_ust_price(config.USTs)
+        config.ZEROES = MarketData.update_ust_price(config.ZEROES)
 
-        return config.USTs, config.FUTURES
+        return config.USTs, config.FUTURES, config.ZEROES
 
     @staticmethod
     def convert_futures_price(df: pd.DataFrame) -> pd.DataFrame:
@@ -133,7 +136,7 @@ class MarketData:
         Retrieve market data from the IBKR API in batches for all conids combined
         from UST_index and FUT_index.
         """
-        con_ids = UST_index['conid'].tolist() + FUT_index['conid'].tolist()
+        con_ids = UST_index['conid'].tolist() + FUT_index['conid'].tolist() + UST_index['corpuscusip_conid'].tolist()
         market_data = []
 
         # Get the market data fields from enum
@@ -158,7 +161,9 @@ class MarketData:
             logging.info(f"Response from {url}: {response.status_code} - Successfully scanned market data.")
             print(f"Batch starting at index {i} response:", response.json())
 
-            market_data.extend(response.json())
+            md = market_data.extend(response.json())
+            md = pd.DataFrame(md)
+            md.to_csv("md.csv")
 
         logging.info("Retrieved market data.")
         return market_data

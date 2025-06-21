@@ -49,8 +49,7 @@ def filter_futures_by_expiry(futures, year_to_maturity=2):
 
 def extract_contract_fields(contract_details):
         """
-        Extracts relevant contract fields from a list of contract detail dictionaries and
-        calculates additional derived fields such as `year_to_maturity`.
+        Extracts relevant contract fields from a list of contract detail dictionaries and calculates additional derived fields such as `year_to_maturity`.
 
         For each contract in the input list, this method:
         - Extracts specified fields using the `FutContractField` enum.
@@ -59,7 +58,6 @@ def extract_contract_fields(contract_details):
 
         Parameters:
         - contract_details (list): A list of dictionaries, each representing a futures contract.
-
         Returns:
         - list: A list of dictionaries with structured contract information including derived fields.
         """
@@ -86,7 +84,6 @@ def extract_contract_fields(contract_details):
                 ContractField.currency.name: contract.get(ContractField.currency.value),
                 ContractField.ticker.name: contract.get(ContractField.ticker.value),
                 ContractField.full_name.name: contract.get(ContractField.full_name.value),
-
                 ContractField.all_exchanges.name: contract.get(ContractField.all_exchanges.value),
                 ContractField.listing_exchanges.name: contract.get(ContractField.listing_exchanges.value),
                 ContractField.asset_class.name: contract.get(ContractField.asset_class.value),
@@ -96,10 +93,8 @@ def extract_contract_fields(contract_details):
                 ContractField.underlying_conid.name: contract.get(ContractField.underlying_conid.value),
                 ContractField.underlying_exchange.name: contract.get(ContractField.underlying_exchange.value),
                 ContractField.multiplier.name: contract.get(ContractField.multiplier.value),
-
                 ContractField.increment.name: next(iter(contract.get('incrementRules', {})), {}).get(
                     ContractField.increment.value),
-
                 ContractField.increment_lower_edge.name: next(iter(contract.get('incrementRules', {})), {}).get(
                     ContractField.increment_lower_edge.value)
             }

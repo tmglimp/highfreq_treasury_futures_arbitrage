@@ -6,10 +6,13 @@ import pandas as pd
 import requests
 import urllib3
 import time
-import os
+from cf_ctd import cf_ctd_main
+from ctd_fut_kpis import run_fixed_income_calculation
+from KPIs2_Orders import calculate_quantities
+
 from fees import calculate_total_fees
 import config
-from config import PERCENT_PROFIT
+from config import risk_reducer
 from leaky_bucket import leaky_bucket
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -65,6 +68,7 @@ def fetch_pending_orders():
               "filledQuantity", "totalSize", "companyName", "status", "order_ccp_status", "origOrderType",
               "supportsTaxOpt", "lastExecutionTime", "orderType", "bgColor", "fgColor", "isEventTrading",
               "price", "timeInForce", "lastExecutionTime_r", "side"]
+
     orders = []
     for raw_order in raw_orders:
         order = {field: raw_order.get(field) for field in fields}
@@ -129,7 +133,7 @@ def check_and_cancel_orders():
     pending_statuses = {"Submitted", "PreSubmitted"}
 
     try:
-        df_placed = pd.read_csv("placed_orders_runtime.csv")
+        df_placed = config.placed_orders_runtime
         df_placed["order_id"] = df_placed["order_id"].astype(str)
     except Exception as e:
         print("⚠️ Could not load placed_orders_runtime.csv. Assuming it's empty.")
@@ -153,10 +157,9 @@ def check_and_cancel_orders():
                 df_placed = df_placed[~df_placed["order_id"].isin(filled_orders)]
                 removed_count = initial_len - len(df_placed)
                 if removed_count > 0:
-                    print(f"\n✅ Removed {removed_count} filled orders from placed_orders_runtime.csv")
-                    df_placed.to_csv("placed_orders.csv", index=False)
+                    print(f"Removed {removed_count} filled orders from placed_orders_runtime")
     except Exception as e:
-        print(f"⚠️ Error removing filled orders from placed_orders.csv: {e}")
+        print(f"⚠️ Error removing filled orders from placed_orders: {e}")
 
     required_columns = {"status", "remainingQuantity", "orderId"}
     if df_orders.empty or not required_columns.issubset(df_orders.columns):
@@ -197,8 +200,8 @@ def check_and_cancel_orders():
                 print(f"Error cancelling order {order_id}: {e}")
         return
 
-    if df_pending.shape[0] < 5:
-        print("Pending orders less than 5. No cancellation needed.")
+    if df_pending.shape[0] < 4:
+        print("Pending orders less than 4. No cancellation needed.")
         return
 
     df_placed_ids = set(df_placed["order_id"])
@@ -208,7 +211,7 @@ def check_and_cancel_orders():
     orphan_ids = df_pending_ids - df_placed_ids
     orphan_orders = df_placed[df_placed["order_id"].isin(orphan_ids)]
 
-    if not orphan_orders.empty and df_pending.shape[0] >= 5:
+    if not orphan_orders.empty and df_pending.shape[0] >= 4:
         print(f"\nFound {len(orphan_orders)} orphan orders:")
         orphan_orders = orphan_orders.sort_values("timestamp")
         print(f'timestamp list of pending orders as', orphan_orders)
@@ -223,7 +226,7 @@ def check_and_cancel_orders():
 
     matched_pending = df_pending[df_pending["order_id"].isin(df_placed["order_id"])]
 
-    if matched_pending.shape[0] > 5:
+    if matched_pending.shape[0] > 4:
         print(f"\n⚠️ There are {len(matched_pending)} matched pending orders. Cancelling oldest to maintain max of 5...")
 
         matched_pending = matched_pending.merge(
@@ -241,118 +244,133 @@ def check_and_cancel_orders():
             print(f"⚠️ Error cancelling order {oldest_order_id}: {e}")
 
 
-def orderRequest(updated_ORDERS):
+...
+
+def orderRequest(updated_ORDERS: pd.DataFrame | None = None) -> None:
+    """Place **one** spread order from *updated_ORDERS* (or *config.updated_ORDERS*)
+    then reconcile the open‑orders queue.
+    """
     global placed_orders_runtime
-    time = str(get_current_timestamp())
 
-    if updated_ORDERS is None:
-        updated_ORDERS = config.updated_ORDERS
+    timestamp = get_current_timestamp()
+    updated_ORDERS = updated_ORDERS if updated_ORDERS is not None else config.updated_ORDERS
 
-    if updated_ORDERS.empty:
+    if updated_ORDERS is None or updated_ORDERS.empty:
         print("No orders available in config.updated_ORDERS to place.")
         return
 
-    print(f"\nupdated_ORDERS:\n{updated_ORDERS}")
+    print("\nupdated_ORDERS:\n", updated_ORDERS)
 
-    for idx, row in updated_ORDERS.iterrows():
-        try:
+    # -----------------------------------------------------------------
+    # Work with the *first* row by **position**, regardless of its index
+    # label.  This avoids KeyError when the frame's index is not 0.
+    # -----------------------------------------------------------------
+    first_row = updated_ORDERS.iloc[0]
 
-            value = row["PairsAdjNetBasis"]
-            value_after_fees = float(value - calculate_total_fees(
-                row["A_FUT_UNDERLYING_EXCHANGE"], row["A_FUT_TICKER"],
-                row["B_FUT_UNDERLYING_EXCHANGE"], row["B_FUT_TICKER"]
-            ))
-            reduced_value = value_after_fees * PERCENT_PROFIT
+    value = first_row["PairsAdjNetBasis"]
+    print("value 265 as", value)
 
-            if reduced_value <= 0:
-                print(f"Skipping trade at index {idx} because reduced_value is {reduced_value}.")
-                continue
+    value_after_fees = value - calculate_total_fees(
+        first_row["A_FUT_UNDERLYING_EXCHANGE"],
+        first_row["A_FUT_TICKER"],
+        first_row["B_FUT_UNDERLYING_EXCHANGE"],
+        first_row["B_FUT_TICKER"],
+    )
+    reduced_value = value_after_fees * risk_reducer
 
-            exact_price = format_value(
-                reduced_value, row["A_FUT_TICKER"], row["B_FUT_TICKER"],
-                row["A_FUT_INCREMENT"], row["B_FUT_INCREMENT"]
-            )
+    if reduced_value <= 0:
+        print(
+            f"Skipping trade because reduced_value is {reduced_value}. "
+            "Requesting fresh data to retry..."
+        )
+        HEDGES = cf_ctd_main()
+        HEDGES_Combos = run_fixed_income_calculation(HEDGES)
+        config.updated_ORDERS = calculate_quantities(HEDGES_Combos, config.SMA)
+        config.updated_ORDERS = config.get_updated_orders()
+        return
 
-            url = f"{config.IBKR_BASE_URL}/v1/api/iserver/account/{config.IBKR_ACCT_ID}/orders"
-            exchange_val = f"SMART;;;{int(row['A_FUT_CONID'])},{int(row['B_FUT_CONID'])}"
-            conidex_val = (
-                f"28812380;;;{int(row['A_FUT_CONID'])}/{int(row['A_Q_Value'] * row['A_Q_Sign'])},"
-                f"{int(row['B_FUT_CONID'])}/{int(row['B_Q_Value'] * row['B_Q_Sign'])}"
-            )
-            price_val = float(int(row['B_Q_Sign']) * exact_price)
+    exact_price = format_value(
+        reduced_value,
+        first_row["A_FUT_TICKER"],
+        first_row["B_FUT_TICKER"],
+        first_row["A_FUT_INCREMENT"],
+        first_row["B_FUT_INCREMENT"],
+    )
+    print("exact_price as", exact_price)
 
-            json_body = {
-                "orders": [
-                    {
-                        "exchange": exchange_val,
-                        "conidex": conidex_val,
-                        "orderType": "LMT",
-                        "price": price_val,
-                        "side": "BUY",
-                        "tif": "GTC",
-                        "quantity": int(row["PairsLCM"]),
-                        "secType": "FUT",
-                        "outsideRth": "True"
-                    }
-                ]
-            }
+    url = f"{config.IBKR_BASE_URL}/v1/api/iserver/account/{config.IBKR_ACCT_ID}/orders"
 
-            leaky_bucket.wait_for_token()
-            print(f"\nPlacing order: {url}")
-            print(json.dumps(json_body, indent=2))
-            order_req = requests.post(url=url, verify=False, json=json_body)
-            print(order_req.status_code)
-            print(order_req.text)
+    front_conid = int(first_row["A_FUT_CONID"])
+    back_conid = int(first_row["B_FUT_CONID"])
+    front_ratio = int(first_row["A_Q_Value"])
+    back_ratio = int(first_row["B_Q_Value"])
+    quantity = 1
+    price = float(back_ratio * exact_price)
 
-            # Decode and parse the byte string response
-            order_response = json.loads(order_req.content.decode("utf-8"))
-
-            # Create the output DataFrame with additional metadata columns
-            placed_orders = pd.DataFrame([{
-                "order_id": order_response[0].get("order_id"),
-                "order_status": order_response[0].get("order_status"),
-                "encrypt_message": order_response[0].get("encrypt_message"),
-                "exchange": exchange_val,
-                "conidex": conidex_val,
+    json_body = {
+        "orders": [
+            {
+                "exchange": f"CBOT;;;{front_conid},{back_conid}",
+                "conidex": f"28812380;;;{front_conid}/{front_ratio},{back_conid}/{back_ratio}",
                 "orderType": "LMT",
-                "price": price_val,
+                "price": price,
                 "side": "BUY",
-                "tif": "GTC",
-                "quantity": int(row["PairsLCM"]),
+                "tif": "DAY",
+                "quantity": quantity,
                 "secType": "FUT",
-                "outsideRth": "True",
-                "pairs_net_basis": value,
-                'RENTD': row['RENTD'],
-                'no_arbitrage_w_fees': value_after_fees,
-                'timestamp': time,
-                #'PosRisk': row['POS_RISK'], #risk-mitigating hedging save rules
-                #'VAR': row['VAR'],
-                #'NET_OVERLAY': row['NET_OVERLAY'],
-                #'+.5bp': row['.5+_overlay'],
-                #'-.5bp': row['.5-_overlay'],
-                #'+.05bp': row['.05+_overlay'],
-                #'-.05bp': row['.05-_overlay'],
-                #'+.005bp': row['.005+_overlay'],
-                #'-.005bp':row['.005-_overlay'],
-                #'+.001bp': row['.001+_overlay'],
-                #'-.001bp': row['.001-_overlay'],
-                #'A_FUT_MDUR': row['A_FUT_MDUR'],
-                #'A_FUT_MACDUR': row['A_FUT_MACDUR'],
-                #'A_FUT_DV01': row['A_FUT_DV01'],
-                #'A_FUT_APRXCVX': row['A_FUT_APRXCVX'],
-                #'B_FUT_MDUR': row['B_FUT_MDUR'],
-                #'B_FUT_MACDUR': row['B_FUT_MACDUR'],
-                #'B_FUT_DV01': row['B_FUT_DV01'],
-                #'B_FUT_APRXCVX': row['B_FUT_APRXCVX']
-            }])
+                "outsideRth": True,
+            }
+        ]
+    }
 
-            placed_orders_runtime = pd.concat([placed_orders_runtime, placed_orders], ignore_index=True)
-            placed_orders_runtime.to_csv('placed_orders_runtime.csv')
-            print("\n✅ Order recorded in placed_orders_runtime.csv")
-            break
-        except Exception as e:
-            print(f"Failed to place order at index {idx}: {e}")
+    leaky_bucket.wait_for_token()
+    print("\nPlacing order:", url)
+    print(json.dumps(json_body, indent=2))
+    order_req = requests.post(url, verify=False, json=json_body)
+    print("status code ⇒", order_req.status_code)
+    print("response     ⇒", order_req.text)
+
+    if order_req.status_code != 200:
+        print("⚠️ Failed to place order. Skipping this attempt.")
+        return
+
+    try:
+        order_response = order_req.json()
+        order_id = order_response[0].get("order_id")
+        order_status = order_response[0].get("order_status")
+        encrypt_message = order_response[0].get("encrypt_message")
+    except Exception as exc:
+        print("⚠️ Error parsing order response:", exc)
+        return
+
+    placed_orders = pd.DataFrame(
+        [
+            {
+                "order_id": order_id,
+                "order_status": order_status,
+                "encrypt_message": encrypt_message,
+                "orderType": "LMT",
+                "price": price,
+                "side": "BUY",
+                "tif": "DAY",
+                "quantity": quantity,
+                "secType": "FUT",
+                "outsideRth": True,
+                "pairs_net_basis": value,
+                "RENTD": first_row["RENTD"],
+                "timestamp": timestamp,
+            }
+        ]
+    )
+
+    placed_orders_runtime = pd.concat([placed_orders_runtime, placed_orders], ignore_index=True)
+    config.placed_orders_runtime = placed_orders_runtime
+    print("Order recorded in config.placed_orders_runtime")
+
+    # Always reconcile the open‑orders queue at the end of each attempt
     check_and_cancel_orders()
+
 
 if __name__ == "__main__":
     orderRequest()
+

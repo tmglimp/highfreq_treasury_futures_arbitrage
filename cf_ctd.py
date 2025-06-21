@@ -80,8 +80,8 @@ def add_to_row_pool(row):
         cutoff = timestamp - timedelta(minutes=SPREAD_TRACK_WINDOW_MINUTES)
         row_pool = row_pool[row_pool['timestamp'] >= cutoff]
 
-        #if row_pool['conid'].value_counts().ge(10).any():
-        #    row_pool.to_csv("row_pool_all.csv", index=False)
+        if row_pool['conid'].value_counts().ge(10).any():
+            row_pool.to_csv("row_pool_all.csv", index=False)
 
 # ---------------- FUTURES -> HEDGES Transformation ----------------
 def transform_futures_hedges(fut_updated, SPREAD_POP):
@@ -175,7 +175,7 @@ def process_futures_ctd(HEDGES, usts):
         eligible = usts[
             (usts['maturity_date'] >= min_maturity_date) &
             (usts['maturity_date'] <= max_maturity_date) &
-            (usts['cf1'].notna())
+            (usts['conversion_factor'].notna())
         ].copy(deep=True)
         if eligible.empty:
             continue
@@ -183,7 +183,7 @@ def process_futures_ctd(HEDGES, usts):
         # print(f"Futures price F as", F)
         days_to_expiry = (f_expiry - trade_date).days
         T_days = max(days_to_expiry, 1)
-        eligible['irr'] = (((F * eligible['cf1']) - eligible['price']) / eligible['price']) * (365 / T_days)
+        eligible['irr'] = (((F * eligible['conversion_factor']) - eligible['price']) / eligible['price']) * (365 / T_days)
         # print(f'IRR selection as', eligible['irr'])
         selected = eligible.loc[eligible['irr'].idxmax()]
         # print(f'selected as', selected)
@@ -200,7 +200,7 @@ def process_futures_ctd(HEDGES, usts):
         HEDGES.at[idx, 'ctd_yield'] = computed_yld
         HEDGES.at[idx, 'ctd_coupon_rate'] = selected.get('coupon')
         HEDGES.at[idx, 'ctd_maturity_date'] = selected.get('maturity_date')
-        HEDGES.at[idx, 'ctd_cf'] = selected.get('cf1')
+        HEDGES.at[idx, 'ctd_cf'] = selected.get('conversion_factor')
         HEDGES.at[idx, 'ctd_prev_cpn'] = selected.get('prvcpn')
         HEDGES.at[idx, 'ctd_ncpdt'] = selected.get('nxtcpn')
         HEDGES.at[idx, 'ctd_ytm'] = selected.get('yrstomat')
